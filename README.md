@@ -25,7 +25,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 API 文档：http://127.0.0.1:8000/docs
 
-热点新闻接口：`GET /api/news/hot?keywords=高考,强基,大学&days=7`
+热点新闻接口：`GET /api/news/hot?provider=volcano&keywords=高考,强基,大学&days=7`
+
+`provider` 可选：`volcano`（火山引擎）、`tianapi`（天行数据）、`justoneapi`
 
 ### 2. 前端
 
@@ -44,6 +46,9 @@ npm run dev
 | `VOLCANO_API_KEY` | 火山方舟 API Key（必填） |
 | `VOLCANO_BASE_URL` | 默认 `https://ark.cn-beijing.volces.com/api/v3` |
 | `VOLCANO_MODEL` | 默认 `doubao-seed-2-0-mini-260428` |
+| `TIANAPI_API_KEY` | 天行数据 API Key |
+| `JUSTONEAPI_TOKEN` | JustOneAPI 访问令牌 |
+| `JUSTONEAPI_BASE_URL` | 默认 `http://47.117.133.51:30015` |
 
 ## 说明
 

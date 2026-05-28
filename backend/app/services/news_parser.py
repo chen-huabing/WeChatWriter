@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import datetime, timedelta
 from typing import Any
 
 from app.config import settings
@@ -50,6 +51,51 @@ def _pick_str(data: dict, *keys: str) -> str:
         if val is not None and str(val).strip():
             return str(val).strip()
     return ""
+
+
+def strip_html(text: str) -> str:
+    return re.sub(r"<[^>]+>", "", text or "").strip()
+
+
+def format_date_from_ctime(ctime: str) -> str:
+    ctime = (ctime or "").strip()
+    if not ctime:
+        return ""
+    return ctime[:10] if len(ctime) >= 10 else ctime
+
+
+def format_date_from_timestamp(ts: int | float | str | None) -> str:
+    if ts is None:
+        return ""
+    try:
+        value = float(ts)
+        if value > 1e12:
+            value /= 1000
+        return datetime.fromtimestamp(value).strftime("%Y-%m-%d")
+    except (TypeError, ValueError, OSError):
+        return ""
+
+
+def parse_item_datetime(date_str: str) -> datetime | None:
+    if not date_str:
+        return None
+    text = date_str.strip()[:19]
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def filter_by_days(items: list[HotNewsItem], days: int) -> list[HotNewsItem]:
+    cutoff = datetime.now() - timedelta(days=days)
+    filtered: list[HotNewsItem] = []
+    for item in items:
+        dt = parse_item_datetime(item.date)
+        if dt is None or dt >= cutoff:
+            filtered.append(item)
+    return filtered if filtered else items
 
 
 def normalize_items(raw_items: list[Any]) -> list[HotNewsItem]:

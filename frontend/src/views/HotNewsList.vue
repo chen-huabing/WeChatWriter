@@ -1,19 +1,43 @@
 <script setup>
-import { ref } from "vue";
-import { fetchHotNews } from "../api/news.js";
+import { computed, onMounted, ref } from "vue";
+import { fetchHotNews, fetchProviders } from "../api/news.js";
 
-const keywords = ref("高考,强基");
+const providers = ref([
+  { id: "volcano", label: "火山引擎", description: "Doubao 模型 + 联网搜索" },
+  { id: "tianapi", label: "天行数据", description: "社会新闻热点 API" },
+  { id: "justoneapi", label: "JustOneAPI", description: "跨平台社交媒体搜索" },
+]);
+const provider = ref("volcano");
+const keywords = ref("高考,强基,大学");
 const days = ref(7);
 const loading = ref(false);
 const error = ref("");
 const result = ref(null);
+
+const currentProvider = computed(
+  () => providers.value.find((p) => p.id === provider.value) || providers.value[0]
+);
+
+const subtitle = computed(() => {
+  const label = currentProvider.value?.label || "数据源";
+  return `通过 ${label} 获取指定关键词近期热点`;
+});
+
+onMounted(async () => {
+  try {
+    const list = await fetchProviders();
+    if (list?.length) providers.value = list;
+  } catch {
+    /* 使用默认列表 */
+  }
+});
 
 async function loadNews() {
   error.value = "";
   loading.value = true;
   result.value = null;
   try {
-    result.value = await fetchHotNews(keywords.value, days.value);
+    result.value = await fetchHotNews(keywords.value, days.value, provider.value);
   } catch (e) {
     error.value = e.message || "加载失败";
   } finally {
@@ -26,16 +50,31 @@ async function loadNews() {
   <div class="page">
     <header class="header">
       <h1>热点新闻列表</h1>
-      <p class="subtitle">通过火山引擎 Doubao 获取指定关键词近期热点</p>
+      <p class="subtitle">{{ subtitle }}</p>
     </header>
 
     <section class="toolbar card">
+      <label class="field field-provider">
+        <span>数据源</span>
+        <select v-model="provider">
+          <option
+            v-for="p in providers"
+            :key="p.id"
+            :value="p.id"
+          >
+            {{ p.label }}
+          </option>
+        </select>
+        <small v-if="currentProvider?.description" class="hint">
+          {{ currentProvider.description }}
+        </small>
+      </label>
       <label class="field">
         <span>关键词</span>
         <input
           v-model="keywords"
           type="text"
-          placeholder="多个关键词用逗号分隔，如：高考,强基"
+          placeholder="多个关键词用逗号分隔，如：高考,强基,大学"
         />
       </label>
       <label class="field field-narrow">
@@ -50,6 +89,7 @@ async function loadNews() {
     <p v-if="error" class="error">{{ error }}</p>
 
     <section v-if="result" class="meta card">
+      <span>数据源：{{ result.provider_label || result.provider }}</span>
       <span>关键词：{{ result.keywords.join("、") }}</span>
       <span>近 {{ result.days }} 天</span>
       <span>共 {{ result.total }} 条</span>
@@ -74,7 +114,7 @@ async function loadNews() {
       </li>
     </ul>
 
-    <p v-else-if="!loading && !error" class="empty">输入关键词后点击「获取热点」</p>
+    <p v-else-if="!loading && !error" class="empty">选择数据源并输入关键词后点击「获取热点」</p>
   </div>
 </template>
 
@@ -124,6 +164,11 @@ async function loadNews() {
   min-width: 200px;
 }
 
+.field-provider {
+  flex: 0 0 200px;
+  min-width: 180px;
+}
+
 .field-narrow {
   flex: 0 0 120px;
 }
@@ -133,11 +178,19 @@ async function loadNews() {
   color: #64748b;
 }
 
-.field input {
+.field input,
+.field select {
   padding: 10px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 1rem;
+  background: #fff;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.3;
 }
 
 .btn-primary {

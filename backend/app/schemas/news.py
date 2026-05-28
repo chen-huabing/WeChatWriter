@@ -9,16 +9,15 @@ class HotNewsItem(BaseModel):
     url: str = Field(..., description="原文链接")
 
 
-class HotNewsRequest(BaseModel):
-    keywords: list[str] = Field(
-        default=["高考", "强基"],
-        min_length=1,
-        description="搜索关键词列表",
-    )
-    days: int = Field(default=7, ge=1, le=30, description="回溯天数")
+class ProviderInfo(BaseModel):
+    id: str
+    label: str
+    description: str
 
 
 class HotNewsResponse(BaseModel):
+    provider: str
+    provider_label: str
     keywords: list[str]
     days: int
     items: list[HotNewsItem]
