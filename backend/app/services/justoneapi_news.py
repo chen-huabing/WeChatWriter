@@ -34,6 +34,41 @@ def _parse_justone_item(raw: dict) -> HotNewsItem | None:
     )
 
 
+_JUSTONEAPI_ERRORS: dict[int, str] = {
+    100: "Token 无效或已失效，请检查 backend/.env 中的 JUSTONEAPI_TOKEN",
+    301: "采集失败，请稍后重试",
+    302: "超出速率限制，请稍后重试",
+    303: "超出每日调用配额",
+    400: "请求参数错误",
+    500: "服务端内部错误",
+    600: "权限不足",
+    601: "账户余额不足，请在 JustOneAPI 控制台充值",
+}
+
+
+def _raise_justoneapi_error(data: dict) -> None:
+    code = data.get("code")
+    try:
+        code_int = int(code)
+    except (TypeError, ValueError):
+        code_int = None
+
+    message = str(data.get("message", "")).strip()
+    if code_int in _JUSTONEAPI_ERRORS:
+        hint = _JUSTONEAPI_ERRORS[code_int]
+        if code_int == 601:
+            hint += "（https://justoneapi.com），或改用火山引擎/天行数据"
+        raise ValueError(f"JustOneAPI 错误: {hint}")
+
+    if message.upper() == "INSUFFICIENT BALANCE":
+        raise ValueError(
+            "JustOneAPI 错误: 账户余额不足，请在 https://justoneapi.com 控制台充值，"
+            "或改用火山引擎/天行数据"
+        )
+
+    raise ValueError(f"JustOneAPI 错误: {message or data}")
+
+
 async def fetch_hot_news(keywords: list[str], days: int = 7) -> list[HotNewsItem]:
     if not settings.justoneapi_token:
         raise ValueError("未配置 JUSTONEAPI_TOKEN，请在 backend/.env 中设置")
@@ -63,7 +98,7 @@ async def fetch_hot_news(keywords: list[str], days: int = 7) -> list[HotNewsItem
 
             code = data.get("code")
             if code not in (0, "0"):
-                raise ValueError(f"JustOneAPI 错误: {data.get('message', data)}")
+                _raise_justoneapi_error(data)
 
             payload = data.get("data") or {}
             raw_list = payload.get("list") or []

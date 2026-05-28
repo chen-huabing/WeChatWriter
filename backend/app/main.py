@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.articles import router as articles_router
 from app.api.news import router as news_router
 
 app = FastAPI(
@@ -18,6 +19,7 @@ app.add_middleware(
 )
 
 app.include_router(news_router)
+app.include_router(articles_router)
 
 
 @app.get("/health")

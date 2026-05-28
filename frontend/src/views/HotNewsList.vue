@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { composeArticle } from "../api/articles.js";
 import { fetchHotNews, fetchProviders } from "../api/news.js";
 
 const providers = ref([
@@ -8,11 +9,13 @@ const providers = ref([
   { id: "justoneapi", label: "JustOneAPI", description: "跨平台社交媒体搜索" },
 ]);
 const provider = ref("volcano");
-const keywords = ref("高考,强基,大学");
+const keywords = ref("强基");
 const days = ref(7);
 const loading = ref(false);
 const error = ref("");
 const result = ref(null);
+const composingIndex = ref(null);
+const composedArticles = ref({});
 
 const currentProvider = computed(
   () => providers.value.find((p) => p.id === provider.value) || providers.value[0]
@@ -36,12 +39,38 @@ async function loadNews() {
   error.value = "";
   loading.value = true;
   result.value = null;
+  composedArticles.value = {};
   try {
     result.value = await fetchHotNews(keywords.value, days.value, provider.value);
   } catch (e) {
     error.value = e.message || "加载失败";
   } finally {
     loading.value = false;
+  }
+}
+
+function formatTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString("zh-CN", { hour12: false });
+}
+
+function articleParagraphs(content) {
+  return (content || "").split(/\n\n+/).filter(Boolean);
+}
+
+async function handleCompose(item, index) {
+  error.value = "";
+  composingIndex.value = index;
+  try {
+    const article = await composeArticle(item);
+    composedArticles.value = { ...composedArticles.value, [index]: article };
+  } catch (e) {
+    error.value = e.message || "改编失败";
+  } finally {
+    composingIndex.value = null;
   }
 }
 </script>
@@ -102,15 +131,39 @@ async function loadNews() {
         <p class="summary">{{ item.summary }}</p>
         <footer class="footer">
           <span class="source">{{ item.source }}</span>
-          <a
-            v-if="item.url"
-            :href="item.url"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            阅读原文
-          </a>
+          <div class="footer-actions">
+            <a
+              v-if="item.url"
+              :href="item.url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              阅读原文
+            </a>
+            <button
+              class="btn-compose"
+              :disabled="composingIndex !== null"
+              @click="handleCompose(item, index)"
+            >
+              {{ composingIndex === index ? "改编中…" : "改编" }}
+            </button>
+          </div>
         </footer>
+        <section v-if="composedArticles[index]" class="composed-article">
+          <header class="composed-header">
+            <h3 class="composed-title">{{ composedArticles[index].title }}</h3>
+            <span class="composed-meta">
+              已保存 · {{ formatTime(composedArticles[index].created_at) }}
+            </span>
+          </header>
+          <p
+            v-for="(para, pIdx) in articleParagraphs(composedArticles[index].content)"
+            :key="pIdx"
+            class="composed-para"
+          >
+            {{ para }}
+          </p>
+        </section>
       </li>
     </ul>
 
@@ -156,6 +209,11 @@ async function loadNews() {
   margin-bottom: 20px;
 }
 
+.toolbar .field {
+  position: relative;
+  padding-bottom: calc(0.75rem * 1.3 + 4px);
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -188,12 +246,17 @@ async function loadNews() {
 }
 
 .hint {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  margin: 0;
   font-size: 0.75rem;
   color: #94a3b8;
   line-height: 1.3;
 }
 
 .btn-primary {
+  margin-bottom: calc(0.75rem * 1.3 + 4px);
   padding: 10px 24px;
   background: #2563eb;
   color: #fff;
@@ -268,8 +331,69 @@ async function loadNews() {
   font-size: 0.85rem;
 }
 
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-compose {
+  padding: 6px 14px;
+  background: #0f766e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-compose:hover:not(:disabled) {
+  background: #0d9488;
+}
+
+.btn-compose:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .source {
   color: #64748b;
+}
+
+.composed-article {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.composed-header {
+  margin-bottom: 12px;
+}
+
+.composed-title {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #0f172a;
+}
+
+.composed-meta {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.composed-para {
+  margin: 0 0 12px;
+  color: #334155;
+  font-size: 0.95rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.composed-para:last-child {
+  margin-bottom: 0;
 }
 
 .empty {

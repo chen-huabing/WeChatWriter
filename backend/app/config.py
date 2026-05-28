@@ -1,9 +1,14 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_ENV_FILE = _BACKEND_DIR / ".env"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE) if _ENV_FILE.is_file() else None,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -23,6 +28,10 @@ class Settings(BaseSettings):
     news_min_items: int = 8
     news_max_items: int = 15
     news_fetch_max_retries: int = 2
+
+    wechat_style_path: Path = _BACKEND_DIR.parent / "doc" / "wechat.md"
+    wechat_style_max_chars: int = 12000
+    articles_data_dir: Path = _BACKEND_DIR / "data" / "articles"
 
 
 settings = Settings()

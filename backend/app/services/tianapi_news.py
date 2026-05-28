@@ -14,6 +14,7 @@ async def fetch_hot_news(keywords: list[str], days: int = 7) -> list[HotNewsItem
         raise ValueError("未配置 TIANAPI_API_KEY，请在 backend/.env 中设置")
 
     batches: list[list[HotNewsItem]] = []
+    empty_keywords: list[str] = []
     num = min(settings.news_max_items, 50)
 
     async with httpx.AsyncClient(timeout=60.0) as client:
@@ -29,8 +30,12 @@ async def fetch_hot_news(keywords: list[str], days: int = 7) -> list[HotNewsItem
             )
             resp.raise_for_status()
             data = resp.json()
+            code = data.get("code")
 
-            if data.get("code") != 200:
+            if code == 250:
+                empty_keywords.append(keyword)
+                continue
+            if code != 200:
                 raise ValueError(f"天行数据 API 错误: {data.get('msg', data)}")
 
             result = data.get("result") or {}
@@ -51,10 +56,17 @@ async def fetch_hot_news(keywords: list[str], days: int = 7) -> list[HotNewsItem
                         url=str(raw.get("url", "")).strip(),
                     )
                 )
-            batches.append(items)
+            if items:
+                batches.append(items)
+            else:
+                empty_keywords.append(keyword)
 
     merged = merge_news_items(*batches)
     filtered = filter_by_days(merged, days)
     if not filtered:
+        if empty_keywords:
+            raise ValueError(
+                f"天行数据未找到与关键词相关的新闻：{'、'.join(empty_keywords)}"
+            )
         raise ValueError("天行数据未返回符合条件的新闻")
     return filtered
